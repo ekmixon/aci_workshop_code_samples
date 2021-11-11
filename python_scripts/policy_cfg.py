@@ -88,8 +88,7 @@ class ApicSession:
         if (time.time() - self.login_timer) > 500:
             self.mo_dir.reauth()
             self.login_timer = time.time()
-        dn_search = self.mo_dir.lookupByDn(dnStrOrDn=dn)
-        return dn_search
+        return self.mo_dir.lookupByDn(dnStrOrDn=dn)
 
     def search_for_children(self, dn, class_filter, return_attribute, prop_incl='config-only', prop_filter=''):
         if self.yaml_to_xml:
@@ -108,11 +107,7 @@ class ApicSession:
 
         # Search
         result = self.mo_dir.query(query)
-        return_list = []
-        for i in result:
-            return_list.append(i.__getattribute__(return_attribute))
-
-        return return_list
+        return [i.__getattribute__(return_attribute) for i in result]
 
     def dn_query_attribute(self, dn, return_attribute, prop_incl='config-only'):
         if self.yaml_to_xml:
@@ -187,21 +182,21 @@ class Create:
         :param f:
         :return:
         """
-    
+
         # Build MO
         top_mo = cobra.model.pol.Uni('')
         fv_tenant = cobra.model.fv.Tenant(top_mo, name=tenant_name)
         vz_filter = cobra.model.vz.Filter(fv_tenant, name=f['name'])
-    
+
         # Process entries
         for entry in f['entries']:
-            entry_details = {}
-    
-            # Translate YAML attributes to ACI format
-            if 'etherType' in entry.keys():
-                entry_details['etherT'] = entry['etherType']
-            else:
-                entry_details['etherT'] = 'ip'
+            entry_details = {
+                'etherT': entry['etherType']
+                if 'etherType' in entry.keys()
+                else 'ip'
+            }
+
+
             if 'protocol' in entry.keys():
                 entry_details['prot'] = entry['protocol']
             else:
@@ -233,7 +228,7 @@ class Create:
                         entry_details['tcpRules'] += str(flag)
             else:
                 entry_details['tcpRules'] = 'unspecified'
-    
+
             cobra.model.vz.Entry(vz_filter,
                                  name=entry['name'],
                                  etherT=entry_details['etherT'],
@@ -244,7 +239,7 @@ class Create:
                                  dToPort=entry_details['dToPort'],
                                  tcpRules=entry_details['tcpRules']
                                  )
-    
+
             # Push changes to apic
             self.mo_dir.commit(fv_tenant, 'Filter')
     
@@ -256,18 +251,16 @@ class Create:
         :param entry:
         :return:
         """
-    
+
         # Look up filter DN
         filter_mo = self.mo_dir.search_by_dn(filter_dn)
-    
+
         # Process entry
-        entry_details = {}
-    
-        # Translate YAML attributes to ACI format
-        if 'etherType' in entry.keys():
-            entry_details['etherT'] = entry['etherType']
-        else:
-            entry_details['etherT'] = 'ip'
+        entry_details = {
+            'etherT': entry['etherType'] if 'etherType' in entry.keys() else 'ip'
+        }
+
+
         if 'protocol' in entry.keys():
             entry_details['prot'] = entry['protocol']
         else:
@@ -299,7 +292,7 @@ class Create:
                     entry_details['tcpRules'] += str(flag)
         else:
             entry_details['tcpRules'] = 'unspecified'
-    
+
         cobra.model.vz.Entry(filter_mo,
                              name=entry['name'],
                              etherT=entry_details['etherT'],
@@ -310,7 +303,7 @@ class Create:
                              dToPort=entry_details['dToPort'],
                              tcpRules=entry_details['tcpRules']
                              )
-    
+
         # Push to APIC
         self.mo_dir.commit(filter_mo, 'Filter Entry')
     
@@ -322,7 +315,7 @@ class Create:
         :param contract:
         :return:
         """
-    
+
         # Build MO
         top_mo = cobra.model.pol.Uni('')
         fv_tenant = cobra.model.fv.Tenant(top_mo, name=tenant_name)
@@ -330,22 +323,18 @@ class Create:
         if 'description' in contract.keys():
             description = contract['description']
         vz_br_cp = cobra.model.vz.BrCP(fv_tenant, name=contract['name'], scope=contract['scope'], descr=description)
-    
+
         # subjects
         for subject in contract['subjects']:
             # Would like to replace 'isUniDirectional' with 'both-directions' so this is a temp work around.
             if 'both-directions' in subject.keys():
-                if not subject['both-directions']:
-                    subject['isUniDirectional'] = True
-                elif subject['both-directions']:
-                    subject['isUniDirectional'] = False
-    
+                subject['isUniDirectional'] = not subject['both-directions']
             if 'isUniDirectional' in subject.keys():
                 vz_subj = cobra.model.vz.Subj(vz_br_cp, name=subject['name'])
-    
+
                 # Unidirectional contract
                 if subject['isUniDirectional']:
-    
+
                     # Filters into EPG
                     if 'filtersIntoEPG' in subject.keys():
                         vz_in_term = cobra.model.vz.InTerm(vz_subj)
@@ -357,13 +346,13 @@ class Create:
                         for f in subject['filters']:
                             cobra.model.vz.RsFiltAtt(vz_in_term, tnVzFilterName=f)
                         cobra.model.vz.OutTerm(vz_subj, descr="", name="", prio="unspecified")
-    
+
                     # Filters out of EPG
                     if 'filtersOutOfEPG' in subject.keys():
                         vz_out_term = cobra.model.vz.OutTerm(vz_subj, descr="", name="", prio="unspecified")
                         for f in subject['filtersOutOfEPG']:
                             cobra.model.vz.RsFiltAtt(vz_out_term, tnVzFilterName=f)
-    
+
                 # Bi-directional subject
                 if not subject['isUniDirectional']:
                     vz_subj = cobra.model.vz.Subj(vz_br_cp, name=subject['name'])
@@ -371,7 +360,7 @@ class Create:
                     if 'filters' in subject.keys():
                         for f in subject['filters']:
                             cobra.model.vz.RsSubjFiltAtt(vz_subj, tnVzFilterName=f)
-    
+
             # If direction not specified, then assume bi-directional
             else:
                 """ Assume bi-directional if not specified """
@@ -379,10 +368,10 @@ class Create:
                 if 'filters' in subject.keys():
                     for f in subject['filters']:
                         cobra.model.vz.RsSubjFiltAtt(vz_subj, tnVzFilterName=f)
-    
+
         # Push changes to apic
         self.mo_dir.commit(fv_tenant, 'Contract')
-    
+
         if 'export-to' in contract.keys():
             for export_tenant_name in contract['export-to']:
                 export_fv_tenant = cobra.model.fv.Tenant(top_mo, name=export_tenant_name)
@@ -400,36 +389,32 @@ class Create:
         :param subject:
         :return:
         """
-    
+
         # Get contract MO
         contract_mo = self.mo_dir.search_by_dn(contract_dn)
-    
+
         # Would like to replace 'isUniDirectional' with 'both-directions' so this is a temp work around.
         if 'both-directions' in subject.keys():
-            if not subject['both-directions']:
-                subject['isUniDirectional'] = True
-            elif subject['both-directions']:
-                subject['isUniDirectional'] = False
-    
+            subject['isUniDirectional'] = not subject['both-directions']
         # Add subject
         vz_subj = cobra.model.vz.Subj(contract_mo, name=subject['name'])
         if 'isUniDirectional' in subject.keys():
-    
+
             # Unidirectional contract
             if subject['isUniDirectional']:
-    
+
                 # Filters into EPG
                 if 'filtersIntoEPG' in subject.keys():
                     vz_in_term = cobra.model.vz.InTerm(vz_subj)
                     for f in subject['filtersIntoEPG']:
                         cobra.model.vz.RsFiltAtt(vz_in_term, tnVzFilterName=f)
-    
+
                 # Filters out of EPG
                 if 'filtersOutOfEPG' in subject.keys():
                     vz_out_term = cobra.model.vz.OutTerm(vz_subj)
                     for f in subject['filtersOutOfEPG']:
                         cobra.model.vz.RsFiltAtt(vz_out_term, tnVzFilterName=f)
-    
+
             # Bi-directional subject
             if not subject['isUniDirectional']:
                 vz_subj = cobra.model.vz.Subj(contract_mo, name=subject['name'])
@@ -437,7 +422,7 @@ class Create:
                 if 'filters' in subject.keys():
                     for f in subject['filters']:
                         cobra.model.vz.RsSubjFiltAtt(vz_subj, tnVzFilterName=f)
-    
+
         # If direction not specified, then assume bi-directional
         else:
             """ Assume bi-directional if not specified """
@@ -445,7 +430,7 @@ class Create:
             if 'filters' in subject.keys():
                 for f in subject['filters']:
                     cobra.model.vz.RsSubjFiltAtt(vz_subj, tnVzFilterName=f)
-    
+
         # Push changes to apic
         self.mo_dir.commit(contract_mo, 'Contract Subjects')
     
@@ -457,49 +442,46 @@ class Create:
         :param l3out:
         :return:
         """
-    
+
         # Build MO
         top_mo = cobra.model.pol.Uni('')
         fv_tenant = cobra.model.fv.Tenant(top_mo, name=tenant_name)
         l3_ext_out = cobra.model.l3ext.Out(fv_tenant, name=l3out['name'])
-    
+
         # External networks
         for ext_net in l3out['external-networks']:
             l3_ext_inst_p = cobra.model.l3ext.InstP(l3_ext_out, name=ext_net['name'])
-    
+
             # Network ranges
-            if 'range' in ext_net.keys():
-                if ext_net['range']:
-                    for network in ext_net['range']:
-                        cobra.model.l3ext.Subnet(l3_ext_inst_p, ip=network)
-    
+            if 'range' in ext_net.keys() and ext_net['range']:
+                for network in ext_net['range']:
+                    cobra.model.l3ext.Subnet(l3_ext_inst_p, ip=network)
+
             # Contracts
             if 'contracts' in ext_net.keys():
                 contracts = ext_net['contracts']
-    
+
                 # Provide contracts
-                if 'provide' in contracts.keys():
-                    if contracts['provide']:
-                        for prov in contracts['provide']:
-                            if isinstance(prov, dict):
-                                prov = prov['name']
-                            cobra.model.fv.RsProv(l3_ext_inst_p, tnVzBrCPName=prov)
-    
+                if 'provide' in contracts.keys() and contracts['provide']:
+                    for prov in contracts['provide']:
+                        if isinstance(prov, dict):
+                            prov = prov['name']
+                        cobra.model.fv.RsProv(l3_ext_inst_p, tnVzBrCPName=prov)
+
                 # Consume contracts
-                if 'consume' in contracts.keys():
-                    if contracts['consume']:
-                        for cons in contracts['consume']:
-                            if isinstance(cons, dict):
-                                cons = cons['name']
-                            cobra.model.fv.RsCons(l3_ext_inst_p, tnVzBrCPName=cons)
-    
+                if 'consume' in contracts.keys() and contracts['consume']:
+                    for cons in contracts['consume']:
+                        if isinstance(cons, dict):
+                            cons = cons['name']
+                        cobra.model.fv.RsCons(l3_ext_inst_p, tnVzBrCPName=cons)
+
                 # Consume imported contracts
                 if 'consume-imported' in contracts.keys():
                         for consume_imported in contracts['consume-imported']:
                             if isinstance(consume_imported, dict):
                                 consume_imported = consume_imported['name']
                             cobra.model.fv.RsConsIf(l3_ext_inst_p, tnVzCPIfName=consume_imported)
-    
+
         # Push changes to apic
         self.mo_dir.commit(fv_tenant, 'L3OUT')
 
@@ -530,47 +512,46 @@ class Create:
         :param ext_net:
         :return:
         """
-    
+
         # Get L3 out MO
         l3out_mo = self.mo_dir.search_by_dn(l3out_dn)
-    
+
         # Add external networks
         l3_ext_inst_p = cobra.model.l3ext.InstP(l3out_mo, name=ext_net['name'])
-    
+
         # Network ranges
-        if 'range' in ext_net.keys():
-            if ext_net['range']:
-                for network in ext_net['range']:
-                    cobra.model.l3ext.Subnet(l3_ext_inst_p, ip=network)
-    
+        if 'range' in ext_net.keys() and ext_net['range']:
+            for network in ext_net['range']:
+                cobra.model.l3ext.Subnet(l3_ext_inst_p, ip=network)
+
         # Contracts
         if 'contracts' in ext_net.keys():
             contracts = ext_net['contracts']
-    
+
             # Provided contracts
-            if 'provide' in contracts.keys():
-                if contracts['provide']:
-                    for prov in contracts['provide']:
-                        if isinstance(prov, dict):
-                                prov = prov['name']
-                        cobra.model.fv.RsProv(l3_ext_inst_p, tnVzBrCPName=prov)
-    
+            if 'provide' in contracts.keys() and contracts['provide']:
+                for prov in contracts['provide']:
+                    if isinstance(prov, dict):
+                            prov = prov['name']
+                    cobra.model.fv.RsProv(l3_ext_inst_p, tnVzBrCPName=prov)
+
             # Consumed contracts
-            if 'consume' in contracts.keys():
-                if contracts['consume']:
-                    for cons in contracts['consume']:
-                        if isinstance(cons, dict):
-                                cons = cons['name']
-                        cobra.model.fv.RsCons(l3_ext_inst_p, tnVzBrCPName=cons)
-    
+            if 'consume' in contracts.keys() and contracts['consume']:
+                for cons in contracts['consume']:
+                    if isinstance(cons, dict):
+                            cons = cons['name']
+                    cobra.model.fv.RsCons(l3_ext_inst_p, tnVzBrCPName=cons)
+
             # Comsume Imported Contracts
-            if 'consume-imported' in contracts.keys():
-                if contracts['consume-imported']:
-                    for consume_imported in contracts['consume-imported']:
-                        if isinstance(consume_imported, dict):
-                                consume_imported = consume_imported['name']
-                        cobra.model.fv.RsConsIf(l3_ext_inst_p, tnVzCPIfName=consume_imported)
-    
+            if (
+                'consume-imported' in contracts.keys()
+                and contracts['consume-imported']
+            ):
+                for consume_imported in contracts['consume-imported']:
+                    if isinstance(consume_imported, dict):
+                            consume_imported = consume_imported['name']
+                    cobra.model.fv.RsConsIf(l3_ext_inst_p, tnVzCPIfName=consume_imported)
+
         # Push changes to apic
         self.mo_dir.commit(l3out_mo, 'ExtNet')
     
@@ -733,28 +714,27 @@ class Create:
         :param app_profile_name:
         :return:
         """
-    
+
         # Build MO
         top_mo = cobra.model.pol.Uni('')
         fv_tenant = cobra.model.fv.Tenant(top_mo, name=tenant_name)
         fv_ap = cobra.model.fv.Ap(fv_tenant, name=app_profile_name)
-    
+
         # for epg in app_profile['epgs']:
-        if 'description' in epg.keys():
-            epg_description = epg['description']
-        else:
-            epg_description = ' '
+        epg_description = epg['description'] if 'description' in epg.keys() else ' '
         fv_epg = cobra.model.fv.AEPg(fv_ap, name=epg['name'], descr=epg_description)
-    
+
         if 'bridge-domain' in epg.keys():
             fv_rs_bd = cobra.model.fv.RsBd(fv_epg, tnFvBDName=epg['bridge-domain'])
         if 'contracts' in epg.keys():
-            if 'provide' in epg['contracts'].keys():
-                if epg['contracts']['provide']:
-                    for provide in epg['contracts']['provide']:
-                        if isinstance(provide, dict):
-                            provide = provide['name']
-                        fv_rs_prov = cobra.model.fv.RsProv(fv_epg, tnVzBrCPName=provide)
+            if (
+                'provide' in epg['contracts'].keys()
+                and epg['contracts']['provide']
+            ):
+                for provide in epg['contracts']['provide']:
+                    if isinstance(provide, dict):
+                        provide = provide['name']
+                    fv_rs_prov = cobra.model.fv.RsProv(fv_epg, tnVzBrCPName=provide)
             if 'consume' in epg['contracts'].keys():
                 for consume in epg['contracts']['consume']:
                     if isinstance(consume, dict):

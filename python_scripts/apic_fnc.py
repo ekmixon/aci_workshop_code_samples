@@ -48,12 +48,11 @@ def host_dns(name, return_ip=False):
 
         if return_ip:
             return ip
+        real_name = gethostbyaddr(ip)[0]
+        if real_name.find('.abc.com') > 0:
+            return real_name.split('.abc.com')[0]
         else:
-            real_name = gethostbyaddr(ip)[0]
-            if real_name.find('.abc.com') > 0:
-                return real_name.split('.abc.com')[0]
-            else:
-                raise SystemError('%s not part of abc.com' % name)
+            raise SystemError('%s not part of abc.com' % name)
 
     except gaierror:
         raise SystemError('%s not found in DNS' % name)
@@ -639,12 +638,11 @@ def create_vpc_policy_grp(md, vpc_grp, vpc_id, node_ids, vpc_pol, debug=False):
     :param debug:
     :return:
     """
-    if len(node_ids) == 2:
-        node1 = node_ids[0]
-        node2 = node_ids[1]
-    else:
+    if len(node_ids) != 2:
         raise SystemError("Must be 2 nodes in vPC Pair")
 
+    node1 = node_ids[0]
+    node2 = node_ids[1]
     top_dn = cobra.mit.naming.Dn.fromString('uni/fabric/protpol/expgep-%s' % vpc_grp)
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)

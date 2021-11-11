@@ -21,11 +21,8 @@ __author__ = 'developer'
 
 
 def main():
-    base_fh = open('base_config.yml', 'r')
-
-    base = yaml.load(base_fh, Loader=yaml.FullLoader)
-
-    base_fh.close()
+    with open('base_config.yml', 'r') as base_fh:
+        base = yaml.load(base_fh, Loader=yaml.FullLoader)
 
     options = argparse.ArgumentParser()
     options.add_argument("-a", "--apic", help="Name or IP of Apic device", required=True)
@@ -37,11 +34,7 @@ def main():
 
     args = options.parse_args()
 
-    if args.password:
-        password = args.password
-    else:
-        password = getpass.getpass("APIC Password: ")
-
+    password = args.password or getpass.getpass("APIC Password: ")
     #apic_ip = host_dns(args.apic, return_ip=True)
 
     md = apic_login(args.apic, args.user, password)

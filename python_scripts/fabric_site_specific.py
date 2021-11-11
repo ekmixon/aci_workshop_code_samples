@@ -20,11 +20,7 @@ def sw_name_create(site_code, fabric, device):
     if device['location']:
         name += '-' + device['location']
 
-    if fabric:
-        name += '-fab' + str(fabric)
-    else:
-        name += '-fab'
-
+    name += '-fab' + str(fabric) if fabric else '-fab'
     if device['node']:
         name += '-sw' + str(device['node'])
 
@@ -55,15 +51,9 @@ def main():
         password = getpass.getpass("APIC Password: ")
 
     # Prompt for passwords that can not stored in YAML file
-    if 'tacacs_key' in site.keys():
-        tacacs_key = site['tacacs_key']
-    else:
-        #tacacs_key = getpass.getpass("Enter TACACS Key: ")
-        tacacs_key = '123'
-
-    if 'backup' in site.keys():
-        if 'username' in site['backup'].keys():
-            backup_password = getpass.getpass("Enter Password for %s: " % site['backup']['username'])
+    tacacs_key = site['tacacs_key'] if 'tacacs_key' in site.keys() else '123'
+    if 'backup' in site.keys() and 'username' in site['backup'].keys():
+        backup_password = getpass.getpass("Enter Password for %s: " % site['backup']['username'])
 
     md = apic_login(args.apic, args.user, password)
 
@@ -73,13 +63,14 @@ def main():
     else:
         register_switches = False
 
-    if 'datetime_format' in site.keys():
-        if 'datetime' in args.task or 'all' in args.task:
-            print("\n======================================")
-            print("Task datetime: Updating timezone...")
-            set_datetime_format(md, site['datetime_format']['site_tz'],
-                                site['datetime_format']['offset_state'],
-                                site['datetime_format']['display_format'])
+    if 'datetime_format' in site.keys() and (
+        'datetime' in args.task or 'all' in args.task
+    ):
+        print("\n======================================")
+        print("Task datetime: Updating timezone...")
+        set_datetime_format(md, site['datetime_format']['site_tz'],
+                            site['datetime_format']['offset_state'],
+                            site['datetime_format']['display_format'])
 
     if 'create_vrf' in args.task or 'all' in args.task:
         print("\n======================================")
@@ -169,6 +160,8 @@ def main():
             leafpairs = site.get('switches', {}).get('Leafs')
             boarders = site.get('switches', {}).get('Boarder_leafs')
 
+            vpc_pol = 'default'
+
             for lp in leafpairs:
                 node_ids = []
 
@@ -182,47 +175,48 @@ def main():
                 swprfl_name = 'leafPair' + str(lp) + '-swPrfl'
                 ifprfl_name = 'leafPair' + str(lp) + '-ifPrfl'
                 vpc_grp = 'leafPair' + str(lp) + '-vpcGrp'
-                vpc_pol = 'default'
-
                 create_switch_profile(md, swprfl_name, node_ids)
                 create_ifprfl(md, ifprfl_name, swprfl_name)
 
                 create_vpc_policy_grp(md, vpc_grp, lp, node_ids, vpc_pol)
 
     # Configure Tacacs Servers
-    if 'tacacs' in site.keys():
-        if 'tacacs' in args.task or 'all' in args.task:
-            print("\n======================================")
-            print("Task TACACS:  Adding TACACS server and setting login domain")
-            order = 1
-            for tacacs in site['tacacs']:
-                print('Creating TACACS %s (%s)...' % (tacacs['server'], tacacs['description']))
-                add_tacacs_server(md, tacacs['server'], tacacs['description'], tacacs_key, order)
-                order += 1
-            login_domains(md)
+    if 'tacacs' in site.keys() and (
+        'tacacs' in args.task or 'all' in args.task
+    ):
+        print("\n======================================")
+        print("Task TACACS:  Adding TACACS server and setting login domain")
+        order = 1
+        for tacacs in site['tacacs']:
+            print('Creating TACACS %s (%s)...' % (tacacs['server'], tacacs['description']))
+            add_tacacs_server(md, tacacs['server'], tacacs['description'], tacacs_key, order)
+            order += 1
+        login_domains(md)
 
     # Configure Backup Policy
-    if 'backup' in site.keys():
-        if 'backup' in args.task or 'all' in args.task:
-            print("\n======================================")
-            print("Task Backup Policy:  Adding Remote host and setting up Daily bacup policy")
-            backup = site['backup']
-            print('Creating Daily back to %s...' % backup['server'])
-            create_backup_policy(md, backup['server'], backup['path'], backup['username'], backup_password)
+    if 'backup' in site.keys() and (
+        'backup' in args.task or 'all' in args.task
+    ):
+        print("\n======================================")
+        print("Task Backup Policy:  Adding Remote host and setting up Daily bacup policy")
+        backup = site['backup']
+        print('Creating Daily back to %s...' % backup['server'])
+        create_backup_policy(md, backup['server'], backup['path'], backup['username'], backup_password)
 
-    if 'bgp_policy' in site.keys():
-        if 'bgp_policy' in args.task or 'all' in args.task:
-            """This will set the BGP AS number and the RouterReflector Nodes"""
-            print("Processing task bgp_policy...")
+    if 'bgp_policy' in site.keys() and (
+        'bgp_policy' in args.task or 'all' in args.task
+    ):
+        """This will set the BGP AS number and the RouterReflector Nodes"""
+        print("Processing task bgp_policy...")
 
-            if type(site['bgp_policy']['rr_nodes']) == int:
-                rr_nodes = [site['bgp_policy']['rr_nodes']]
-            else:
-                rr_nodes = site['bgp_policy']['rr_nodes'].split(',')
+        if type(site['bgp_policy']['rr_nodes']) == int:
+            rr_nodes = [site['bgp_policy']['rr_nodes']]
+        else:
+            rr_nodes = site['bgp_policy']['rr_nodes'].split(',')
 
-            set_bgp_policy(md, site['bgp_policy']['site_as'], rr_nodes)
+        set_bgp_policy(md, site['bgp_policy']['site_as'], rr_nodes)
 
-            create_poddefault_policy(md)
+        create_poddefault_policy(md)
 
 if __name__ == '__main__':
     main()
