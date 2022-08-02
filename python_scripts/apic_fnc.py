@@ -48,15 +48,14 @@ def host_dns(name, return_ip=False):
 
         if return_ip:
             return ip
+        real_name = gethostbyaddr(ip)[0]
+        if real_name.find('.abc.com') > 0:
+            return real_name.split('.abc.com')[0]
         else:
-            real_name = gethostbyaddr(ip)[0]
-            if real_name.find('.abc.com') > 0:
-                return real_name.split('.abc.com')[0]
-            else:
-                raise SystemError('%s not part of abc.com' % name)
+            raise SystemError(f'{name} not part of abc.com')
 
     except gaierror:
-        raise SystemError('%s not found in DNS' % name)
+        raise SystemError(f'{name} not found in DNS')
 
 
 def apic_login(apic, user, password):
@@ -68,11 +67,11 @@ def apic_login(apic, user, password):
     :return:
     """
 
-    ls = cobra.mit.session.LoginSession('https://' + apic, user, password)
+    ls = cobra.mit.session.LoginSession(f'https://{apic}', user, password)
     md = cobra.mit.access.MoDirectory(ls)
     md.login()
 
-    print("Logged into %s" % apic)
+    print(f"Logged into {apic}")
     return md
 
 
@@ -114,12 +113,12 @@ def set_bgp_policy(md, site_as, rr_nodes, debug=False):
 
     for node in rr_nodes:
         if node_id == 0:
-            bgp_rrnode_pe_p = cobra.model.bgp.RRNodePEp(bgp_rrp, descr='', id='%s' % node)
+            bgp_rrnode_pe_p = cobra.model.bgp.RRNodePEp(bgp_rrp, descr='', id=f'{node}')
             node_id = 1
         elif node_id == 1:
-            bgp_rrnode_pe_p2 = cobra.model.bgp.RRNodePEp(bgp_rrp, descr='', id='%s' % node)
+            bgp_rrnode_pe_p2 = cobra.model.bgp.RRNodePEp(bgp_rrp, descr='', id=f'{node}')
 
-    bgp_as_p = cobra.model.bgp.AsP(bgp_inst_pol, descr='', asn='%s' % site_as)
+    bgp_as_p = cobra.model.bgp.AsP(bgp_inst_pol, descr='', asn=f'{site_as}')
 
     apic_commit(md, top_mo, debug)
 
@@ -160,11 +159,11 @@ def create_generic_vrf(md, vrf_name, debug=False):
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-common/ctx-%s' % vrf_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/tn-common/ctx-{vrf_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
-    fv_ctx = cobra.model.fv.Ctx(top_mo, name='%s' % vrf_name)
+    fv_ctx = cobra.model.fv.Ctx(top_mo, name=f'{vrf_name}')
     vz_any = cobra.model.vz.Any(fv_ctx, matchT='AtleastOne')
     vz_rs_any_to_prov = cobra.model.vz.RsAnyToProv(vz_any, tnVzBrCPName='default', matchT='AtleastOne',
                                                    prio='unspecified')
@@ -241,7 +240,10 @@ def set_ntp_server(md, ntp_srv, epg, debug=False, prefer='false'):
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/fabric/time-default/ntpprov-%s' % ntp_srv)
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/fabric/time-default/ntpprov-{ntp_srv}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -276,7 +278,10 @@ def set_dns_srv(md, dns_srv, debug=False, prefer='false'):
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/fabric/dnsp-default/prov-[%s]' % dns_srv)
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/fabric/dnsp-default/prov-[{dns_srv}]'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -294,7 +299,10 @@ def set_dns_domain(md, domain, epg, debug=False, prefer='false'):
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/fabric/dnsp-default/dom-%s' % domain)
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/fabric/dnsp-default/dom-{domain}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -331,7 +339,7 @@ def set_syslog(md, grp_name, level, events_inc, dest_grp_name, servers, epg, deb
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/fabric/slgroup-%s' % grp_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/fabric/slgroup-{grp_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -351,18 +359,24 @@ def set_syslog(md, grp_name, level, events_inc, dest_grp_name, servers, epg, deb
 
     apic_commit(md, top_mo, debug)
 
-    top_dn = cobra.mit.naming.Dn.fromString('uni/fabric/moncommon/slsrc-%s' % grp_name)
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/fabric/moncommon/slsrc-{grp_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
     syslog_src = cobra.model.syslog.Src(top_mo, name=grp_name, minSev=level, incl=events_inc)
-    syslog_rs_dest_group = cobra.model.syslog.RsDestGroup(syslog_src, tDn='uni/fabric/slgroup-%s' % dest_grp_name)
+    syslog_rs_dest_group = cobra.model.syslog.RsDestGroup(
+        syslog_src, tDn=f'uni/fabric/slgroup-{dest_grp_name}'
+    )
+
 
     apic_commit(md, top_mo, debug)
 
 
 def create_interface_pol(md, pol_name, speed, auto_neg, link_debounce=100, debug=False):
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/hintfpol-%s' % pol_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/infra/hintfpol-{pol_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -382,7 +396,7 @@ def create_cdp_pol(md, pol_name, admin_state, debug=False):
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/cdpIfP-%s' % pol_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/infra/cdpIfP-{pol_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -400,7 +414,7 @@ def create_lldp_pol(md, pol_name, rx_state, tx_state, debug=False):
     :param tx_state:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/lldpIfP-%s' % pol_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/infra/lldpIfP-{pol_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -423,7 +437,7 @@ def create_lacp_pol(md, pol_name, min_links, max_links, ctrl, mode, debug=False)
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/lacplagp-%s' % pol_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/infra/lacplagp-{pol_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -443,7 +457,7 @@ def create_stp_pol(md, pol_name, ctrl, debug=False):
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/ifPol-%s' % pol_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/infra/ifPol-{pol_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -460,20 +474,27 @@ def create_aep_prfl(md, prfl_name, infra_enable, phys_dom, infra_vlan=False, deb
     :param debug:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/attentp-%s' % prfl_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/infra/attentp-{prfl_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
     # build the request using cobra syntax
     infra_att_entity_p = cobra.model.infra.AttEntityP(top_mo, ownerKey='', name=prfl_name, descr='', ownerTag='')
     if phys_dom:
-        infra_rs_dom_p = cobra.model.infra.RsDomP(infra_att_entity_p, tDn='uni/phys-%s' % phys_dom)
+        infra_rs_dom_p = cobra.model.infra.RsDomP(
+            infra_att_entity_p, tDn=f'uni/phys-{phys_dom}'
+        )
+
 
     if infra_enable:
         infra_prov_acc = cobra.model.infra.ProvAcc(infra_att_entity_p, name='provacc', descr='')
         dhcp_infra_prov_p = cobra.model.dhcp.InfraProvP(infra_prov_acc, mode='controller', descr='', name='')
-        infra_rs_func_to_epg = cobra.model.infra.RsFuncToEpg(infra_prov_acc, tDn='uni/tn-infra/ap-access/epg-default',
-                                                             encap='vlan-%s' % infra_vlan)
+        infra_rs_func_to_epg = cobra.model.infra.RsFuncToEpg(
+            infra_prov_acc,
+            tDn='uni/tn-infra/ap-access/epg-default',
+            encap=f'vlan-{infra_vlan}',
+        )
+
 
     if 'ucsStnd' in prfl_name:
         infra_att_policy_group = cobra.model.infra.AttPolicyGroup(infra_att_entity_p, name='', descr='')
@@ -494,7 +515,10 @@ def create_physdom(md, physdom_name, pool_name, pool_type, debug=False):
 
     phys_dom_p = cobra.model.phys.DomP(top_mo, ownerKey='', name=physdom_name, ownerTag='')
     # infra_rt_dom_p = cobra.model.infra.RtDomP(phys_dom_p, tDn="uni/infra/attentp-%s" % aep_prfl)
-    infra_rs_vlan_ns = cobra.model.infra.RsVlanNs(phys_dom_p, tDn='uni/infra/vlanns-[%s]-%s' % (pool_name, pool_type))
+    infra_rs_vlan_ns = cobra.model.infra.RsVlanNs(
+        phys_dom_p, tDn=f'uni/infra/vlanns-[{pool_name}]-{pool_type}'
+    )
+
 
     apic_commit(md, phys_dom_p, debug)
 
@@ -509,7 +533,10 @@ def create_vlan_pool(md, pool_name, pool_type, vlan_from, vlan_to, physdom_name,
     :param physdom_name:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/vlanns-[%s]-%s' % (pool_name, pool_type))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/infra/vlanns-[{pool_name}]-{pool_type}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -541,8 +568,8 @@ def create_switch_profile(md, prf_name, node_ids, debug=False):
     else:
         raise SystemError("Invalid node numbers please check config")
 
-    name_leaf1 = "sw" + str(node1)
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/nprof-%s' % prf_name)
+    name_leaf1 = f"sw{str(node1)}"
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/infra/nprof-{prf_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -552,7 +579,7 @@ def create_switch_profile(md, prf_name, node_ids, debug=False):
 
     if type(node_ids) == list:
         if len(node_ids) == 2:
-            name_leaf2 = "sw" + str(node_ids[1])
+            name_leaf2 = f"sw{str(node_ids[1])}"
             infra_leaf_s2 = cobra.model.infra.LeafS(infra_node_p, type='range', name=name_leaf2)
             infra_node_blk2 = cobra.model.infra.NodeBlk(infra_leaf_s2, to_=node_ids[1], from_=node_ids[1],
                                                         name='block1')
@@ -572,7 +599,10 @@ def register_switch(md, node_id, hostname, sw_serial, debug=False):
     :param debug: if debuging is on or off
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/controller/nodeidentpol/nodep-%s' % sw_serial)
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/controller/nodeidentpol/nodep-{sw_serial}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -598,9 +628,15 @@ def create_node_mgmt_addr(md, node_id, inband_gw, inband_ip, outband_gw, outband
     top_mo = cobra.model.pol.Uni('')
 
     fv_tenant = cobra.model.fv.Tenant(top_mo, name='mgmt')
-    fvns_addr_inst = cobra.model.fvns.AddrInst(fv_tenant, addr=inband_gw, name='sw%s-mgmtinbaddr' % node_id)
+    fvns_addr_inst = cobra.model.fvns.AddrInst(
+        fv_tenant, addr=inband_gw, name=f'sw{node_id}-mgmtinbaddr'
+    )
+
     fvns_ucast_addr_blk = cobra.model.fvns.UcastAddrBlk(fvns_addr_inst, from_=inband_ip, to=inband_ip)
-    fvns_addr_inst2 = cobra.model.fvns.AddrInst(fv_tenant, addr=outband_gw, name='sw%s-mgmtoobaddr' % node_id)
+    fvns_addr_inst2 = cobra.model.fvns.AddrInst(
+        fv_tenant, addr=outband_gw, name=f'sw{node_id}-mgmtoobaddr'
+    )
+
     fvns_ucast_addr_blk2 = cobra.model.fvns.UcastAddrBlk(fvns_addr_inst2, from_=outband_ip, to=outband_ip)
 
     apic_commit(md, fv_tenant, debug)
@@ -610,17 +646,27 @@ def create_node_mgmt_addr(md, node_id, inband_gw, inband_ip, outband_gw, outband
 
     infra_infra = cobra.model.infra.Infra(top_mo)
     infra_func_p = cobra.model.infra.FuncP(infra_infra)
-    mgmt_grp = cobra.model.mgmt.Grp(infra_func_p, name='sw%s-mgmt' % node_id)
-    mgmt_inb_zone = cobra.model.mgmt.InBZone(mgmt_grp, name='sw%s-mgmt' % node_id)
-    mgmt_rs_addr_inst = cobra.model.mgmt.RsAddrInst(mgmt_inb_zone,
-                                                    tDn='uni/tn-mgmt/addrinst-sw%s-mgmtinbaddr' % node_id)
+    mgmt_grp = cobra.model.mgmt.Grp(infra_func_p, name=f'sw{node_id}-mgmt')
+    mgmt_inb_zone = cobra.model.mgmt.InBZone(mgmt_grp, name=f'sw{node_id}-mgmt')
+    mgmt_rs_addr_inst = cobra.model.mgmt.RsAddrInst(
+        mgmt_inb_zone, tDn=f'uni/tn-mgmt/addrinst-sw{node_id}-mgmtinbaddr'
+    )
+
     mgmt_rs_inb_epg = cobra.model.mgmt.RsInbEpg(mgmt_inb_zone, tDn='uni/tn-mgmt/mgmtp-default/inb-default')
     mgmt_oob_zone = cobra.model.mgmt.OoBZone(mgmt_grp)
-    mgmt_rs_addr_inst2 = cobra.model.mgmt.RsAddrInst(mgmt_oob_zone,
-                                                     tDn='uni/tn-mgmt/addrinst-sw%s-mgmtoobaddr' % node_id)
+    mgmt_rs_addr_inst2 = cobra.model.mgmt.RsAddrInst(
+        mgmt_oob_zone, tDn=f'uni/tn-mgmt/addrinst-sw{node_id}-mgmtoobaddr'
+    )
+
     mgmt_rs_oob_epg = cobra.model.mgmt.RsOobEpg(mgmt_oob_zone, tDn='uni/tn-mgmt/mgmtp-default/oob-default')
-    mgmt_node_grp = cobra.model.mgmt.NodeGrp(infra_infra, type='range', name='sw%s-mgmt' % node_id)
-    mgmt_rs_grp = cobra.model.mgmt.RsGrp(mgmt_node_grp, tDn='uni/infra/funcprof/grp-sw%s-mgmt' % node_id)
+    mgmt_node_grp = cobra.model.mgmt.NodeGrp(
+        infra_infra, type='range', name=f'sw{node_id}-mgmt'
+    )
+
+    mgmt_rs_grp = cobra.model.mgmt.RsGrp(
+        mgmt_node_grp, tDn=f'uni/infra/funcprof/grp-sw{node_id}-mgmt'
+    )
+
     infra_node_blk = cobra.model.infra.NodeBlk(mgmt_node_grp, from_=node_id, to_=node_id, name=node_id)
 
     apic_commit(md, infra_infra, debug)
@@ -639,13 +685,12 @@ def create_vpc_policy_grp(md, vpc_grp, vpc_id, node_ids, vpc_pol, debug=False):
     :param debug:
     :return:
     """
-    if len(node_ids) == 2:
-        node1 = node_ids[0]
-        node2 = node_ids[1]
-    else:
+    if len(node_ids) != 2:
         raise SystemError("Must be 2 nodes in vPC Pair")
 
-    top_dn = cobra.mit.naming.Dn.fromString('uni/fabric/protpol/expgep-%s' % vpc_grp)
+    node1 = node_ids[0]
+    node2 = node_ids[1]
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/fabric/protpol/expgep-{vpc_grp}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -670,12 +715,18 @@ def create_vpc_ifpolgrp(md, pol_name, aep_prfl, ll_pol, cdp_pol, lldp_pol, stp_p
     :param lacp_pol:
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/funcprof/accbundle-%s' % pol_name)
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/infra/funcprof/accbundle-{pol_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
     infra_acc_bndl_grp = cobra.model.infra.AccBndlGrp(top_mo, lagT='node', name=pol_name)
-    infra_rs_att_ent_p = cobra.model.infra.RsAttEntP(infra_acc_bndl_grp, tDn='uni/infra/attentp-%s' % aep_prfl)
+    infra_rs_att_ent_p = cobra.model.infra.RsAttEntP(
+        infra_acc_bndl_grp, tDn=f'uni/infra/attentp-{aep_prfl}'
+    )
+
     infra_rs_hif_pol = cobra.model.infra.RsHIfPol(infra_acc_bndl_grp, tnFabricHIfPolName=ll_pol)
     infra_rs_cdp_if_pol = cobra.model.infra.RsCdpIfPol(infra_acc_bndl_grp, tnCdpIfPolName=cdp_pol)
     infra_rs_lldp_if_pol = cobra.model.infra.RsLldpIfPol(infra_acc_bndl_grp, tnLldpIfPolName=lldp_pol)
@@ -693,7 +744,7 @@ def create_ifprfl(md, prfl_name, switch_prfl, debug=False):
     :param switch_prfl: Switch Profile to add interface profile to
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/infra/accportprof-%s' % prfl_name)
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/infra/accportprof-{prfl_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -702,15 +753,21 @@ def create_ifprfl(md, prfl_name, switch_prfl, debug=False):
 
     apic_commit(md, top_mo, debug)
 
-    top_mo = md.lookupByDn('uni/infra/nprof-%s' % switch_prfl)
+    top_mo = md.lookupByDn(f'uni/infra/nprof-{switch_prfl}')
 
-    infra_rs_acc_port_p = cobra.model.infra.RsAccPortP(top_mo, tDn='uni/infra/accportprof-%s' % prfl_name)
+    infra_rs_acc_port_p = cobra.model.infra.RsAccPortP(
+        top_mo, tDn=f'uni/infra/accportprof-{prfl_name}'
+    )
+
 
     apic_commit(md, top_mo, debug)
 
 
 def assign_subnet_bd(md, gw_address, subnet_scope, l3_route_prfl, debug=False):
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-mgmt/BD-inb/subnet-[%s]' % gw_address)
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-mgmt/BD-inb/subnet-[{gw_address}]'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -746,7 +803,10 @@ def create_filter(md, tenant_name, filter_name, debug=False):
     :param debug: if debuging is on or off
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/flt-%s' % (tenant_name, filter_name))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-{tenant_name}/flt-{filter_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -756,7 +816,10 @@ def create_filter(md, tenant_name, filter_name, debug=False):
 
 
 def create_filter_entry(md, tenant_name, filter_name, entry_name, entry_details, debug=False):
-    top_dn = cobra.mit.naming.Dn.fromString(u'uni/tn-%s/flt-%s/e-%s' % (tenant_name, filter_name, entry_name))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-{tenant_name}/flt-{filter_name}/e-{entry_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -811,7 +874,10 @@ def create_contract(md, tenant_name, contract_name, contract_scope, debug=False)
     :param debug: if debuging is on or off
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/brc-%s' % (tenant_name, contract_name))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-{tenant_name}/brc-{contract_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -838,7 +904,10 @@ def create_contract_subject_uni(md,
     :param debug: if debuging is on or off
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/brc-%s/subj-%s' % (tenant_name, contract_name, subject_name))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-{tenant_name}/brc-{contract_name}/subj-{subject_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -867,7 +936,10 @@ def create_contract_subject_bi(md, tenant_name, contract_name, subject_name, fil
     :return:
     """
 
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/brc-%s/subj-%s' % (tenant_name, contract_name, subject_name))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-{tenant_name}/brc-{contract_name}/subj-{subject_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -889,7 +961,10 @@ def create_l3out(md, tenant_name, l3out_name, debug=False):
     :return:
     """
 
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/out-%s' % (tenant_name, l3out_name))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-{tenant_name}/out-{l3out_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -909,7 +984,10 @@ def create_external_network(md, tenant_name, l3out_name, extnet_name, network_li
     :param debug: if debugging is on or off
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/out-%s/instP-%s' % (tenant_name, l3out_name, extnet_name))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-{tenant_name}/out-{l3out_name}/instP-{extnet_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -932,7 +1010,10 @@ def config_extnet_contract(md, tenant_name, l3out_name, extnet_name, provide_lis
     :param debug: if debugging is on or off
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/out-%s/instP-%s' % (tenant_name, l3out_name, extnet_name))
+    top_dn = cobra.mit.naming.Dn.fromString(
+        f'uni/tn-{tenant_name}/out-{l3out_name}/instP-{extnet_name}'
+    )
+
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -955,7 +1036,7 @@ def create_vrf(md, tenant_name, vrf_name, debug=False):
     :param debug: if debugging is on or off
     :return:
     """
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/ctx-%s' % (tenant_name, vrf_name))
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/tn-{tenant_name}/ctx-{vrf_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -966,7 +1047,7 @@ def create_vrf(md, tenant_name, vrf_name, debug=False):
 
 def config_vrf_contract(md, tenant_name, vrf_name, provide_list, consume_list, debug=False):
 
-    top_dn = cobra.mit.naming.Dn.fromString('uni/tn-%s/ctx-%s' % (tenant_name, vrf_name))
+    top_dn = cobra.mit.naming.Dn.fromString(f'uni/tn-{tenant_name}/ctx-{vrf_name}')
     top_parent_dn = top_dn.getParent()
     top_mo = md.lookupByDn(top_parent_dn)
 
@@ -1071,7 +1152,7 @@ def login_domains(md, debug=False):
 
 def create_backup_policy(md, remote_host, remote_path, username, password, protocol='sftp', port='22', debug=False):
     # Setup Remote Location
-    topDn = cobra.mit.naming.Dn.fromString('uni/fabric/path-%s' % remote_host)
+    topDn = cobra.mit.naming.Dn.fromString(f'uni/fabric/path-{remote_host}')
     topParentDn = topDn.getParent()
     topMo = md.lookupByDn(topParentDn)
 

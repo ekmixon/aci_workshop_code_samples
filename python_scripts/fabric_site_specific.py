@@ -20,11 +20,7 @@ def sw_name_create(site_code, fabric, device):
     if device['location']:
         name += '-' + device['location']
 
-    if fabric:
-        name += '-fab' + str(fabric)
-    else:
-        name += '-fab'
-
+    name += f'-fab{str(fabric)}' if fabric else '-fab'
     if device['node']:
         name += '-sw' + str(device['node'])
 
